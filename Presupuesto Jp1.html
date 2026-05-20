@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mi Presupuesto</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f0e;--card:#1a1e1a;--card2:#1f241f;--border:#2a2f2a;
+  --accent:#c8f060;--accent2:#ff6b4a;--text:#e8ede8;--muted:#7a8a7a;
+  --savings:#60f0c8;--warn:#f0c860;--danger:#ff4a4a;
+}
+body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;padding:1.5rem 1rem 4rem}
+.container{max-width:720px;margin:0 auto}
+
+header{margin-bottom:1.5rem}
+.label{font-size:.58rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+h1{font-family:'DM Serif Display',serif;font-size:clamp(1.8rem,7vw,2.8rem);line-height:1;color:var(--accent);letter-spacing:-.02em}
+h1 span{color:var(--text);font-style:italic}
+
+.tabs{display:flex;gap:.5rem;margin-bottom:1.5rem;border-bottom:1px solid var(--border);padding-bottom:.75rem}
+.tab{background:none;border:1px solid var(--border);border-radius:8px;padding:.45rem .9rem;font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);cursor:pointer;letter-spacing:.08em;text-transform:uppercase;transition:all .15s}
+.tab.active{background:var(--accent);border-color:var(--accent);color:#0d0f0e;font-weight:500}
+
+.panel{display:none}.panel.active{display:block}
+
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:.65rem;margin-bottom:1.25rem}
+.sum-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:.9rem 1rem;position:relative;overflow:hidden}
+.sum-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.sum-card.c-total::before{background:var(--accent)}
+.sum-card.c-fixed::before{background:var(--accent2)}
+.sum-card.c-savings::before{background:var(--savings)}
+.sum-label{font-size:.52rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem}
+.sum-value{font-family:'DM Serif Display',serif;font-size:1.35rem;letter-spacing:-.02em}
+
+.progress-wrap{margin-bottom:1.25rem}
+.progress-label{display:flex;justify-content:space-between;font-size:.55rem;color:var(--muted);margin-bottom:.35rem;letter-spacing:.08em;text-transform:uppercase}
+.progress-bg{height:5px;background:var(--border);border-radius:99px;overflow:hidden}
+.progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#3a5a3a,var(--savings));transition:width .5s cubic-bezier(.22,1,.36,1)}
+
+.expense-list{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:1.25rem}
+
+/* 6 columns: name | amount | dueDay | % | paid | delete */
+.list-header{padding:.7rem 1.1rem;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 72px 62px 42px 24px 22px;gap:.4rem;align-items:center}
+.list-header span{font-size:.5rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:right}
+.list-header span:first-child{text-align:left}
+
+.section-divider{padding:.45rem 1.1rem;background:rgba(96,240,200,.05);border-bottom:1px solid var(--border);border-top:1px solid rgba(96,240,200,.12);font-size:.5rem;letter-spacing:.15em;text-transform:uppercase;color:var(--savings)}
+
+.expense-row{display:grid;grid-template-columns:1fr 72px 62px 42px 24px 22px;gap:.4rem;align-items:center;padding:.65rem 1.1rem;border-bottom:1px solid var(--border);transition:background .15s,opacity .3s}
+.expense-row:last-child{border-bottom:none}
+.expense-row:hover{background:rgba(200,240,96,.025)}
+.expense-row.is-savings:hover{background:rgba(96,240,200,.03)}
+.expense-row.is-paid{opacity:.45}
+.expense-row.is-paid .row-name{text-decoration:line-through;color:#5a7a5a}
+
+.row-input{font-size:.72rem;padding:3px 5px;border-radius:5px;border:1px solid transparent;outline:none;background:transparent;font-family:'DM Mono',monospace;color:var(--text);width:100%;transition:border-color .15s,background .15s}
+.row-input:focus{border-color:var(--border);background:var(--card2)}
+.row-input.amount{color:var(--accent);text-align:right}
+.is-savings .row-input.amount{color:var(--savings)}
+
+/* Due day input — styled like a small badge that's editable */
+.row-due{font-size:.62rem;padding:3px 5px;border-radius:5px;border:1px solid transparent;outline:none;background:transparent;font-family:'DM Mono',monospace;width:100%;text-align:center;transition:border-color .15s,background .15s;cursor:text;}
+.row-due:focus{border-color:var(--border);background:var(--card2)}
+.row-due.ok   {color:#5a9a5a}
+.row-due.soon {color:var(--warn)}
+.row-due.late {color:var(--danger)}
+.row-due.weekly{color:var(--muted)}
+
+.row-pct{font-size:.55rem;color:var(--muted);text-align:right}
+
+.paid-check{width:20px;height:20px;border:1.5px solid var(--border);border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s,border-color .2s;font-size:.65rem;color:transparent;user-select:none;margin:0 auto}
+.paid-check.checked{background:#3a5a3a;border-color:#5a7a5a;color:var(--savings)}
+
+.delete-btn{width:20px;height:20px;border:none;background:none;cursor:pointer;color:var(--border);font-size:1rem;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:color .15s;flex-shrink:0}
+.delete-btn:hover{color:var(--accent2);background:rgba(255,107,74,.1)}
+
+/* ADD */
+.add-section{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem;margin-bottom:1.25rem}
+.add-title{font-size:.52rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.85rem}
+.add-row{display:grid;grid-template-columns:1fr 80px 80px auto;gap:.5rem;align-items:center;margin-bottom:.6rem}
+.add-row2{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap}
+.add-input{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;font-family:'DM Mono',monospace;font-size:.72rem;color:var(--text);outline:none;transition:border-color .15s;width:100%}
+.add-input:focus{border-color:var(--accent)}
+.add-input::placeholder{color:var(--muted)}
+.add-btn{background:var(--accent);border:none;border-radius:8px;padding:.5rem .9rem;font-family:'DM Mono',monospace;font-size:.68rem;font-weight:500;color:#0d0f0e;cursor:pointer;transition:opacity .15s,transform .1s;white-space:nowrap}
+.add-btn:hover{opacity:.85}.add-btn:active{transform:scale(.97)}
+.toggle-label{display:flex;align-items:center;gap:.4rem;font-size:.6rem;color:var(--muted);cursor:pointer;user-select:none}
+.toggle-box{width:14px;height:14px;border:1.5px solid var(--border);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:.55rem;color:transparent;transition:all .2s}
+.toggle-box.on{background:rgba(96,240,200,.15);border-color:var(--savings);color:var(--savings)}
+
+/* WEEKS */
+.month-header{font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem}
+.weeks-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem;margin-bottom:1.5rem}
+.week-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:border-color .2s}
+.week-card.complete{border-color:rgba(96,240,96,.3)}
+.week-head{padding:.75rem 1rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.week-title{font-family:'DM Serif Display',serif;font-size:1rem;color:var(--text)}
+.week-dates{font-size:.5rem;color:var(--muted);letter-spacing:.08em}
+.week-badge{font-size:.52rem;padding:3px 7px;border-radius:20px;background:rgba(200,240,96,.1);color:var(--accent);border:1px solid rgba(200,240,96,.2)}
+.week-badge.done{background:rgba(96,240,96,.12);color:#60f060;border-color:rgba(96,240,96,.25)}
+.week-body{padding:.85rem 1rem}
+.days-row{display:grid;grid-template-columns:repeat(5,1fr);gap:.35rem;margin-bottom:.75rem}
+.day-btn{background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:.45rem .2rem;text-align:center;cursor:pointer;transition:all .2s;font-family:'DM Mono',monospace}
+.day-btn .day-name{font-size:.48rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.25rem}
+.day-btn .day-check{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--border);margin:0 auto;transition:all .2s}
+.day-btn.earned .day-check{background:var(--accent);border-color:var(--accent);box-shadow:0 0 6px rgba(200,240,96,.4)}
+.day-btn.earned .day-name{color:var(--accent)}
+.day-btn:hover{border-color:rgba(200,240,96,.3);background:rgba(200,240,96,.03)}
+.week-progress{margin-bottom:.6rem}
+.week-prog-label{display:flex;justify-content:space-between;font-size:.52rem;color:var(--muted);margin-bottom:.3rem}
+.week-prog-bg{height:4px;background:var(--border);border-radius:99px;overflow:hidden}
+.week-prog-fill{height:100%;border-radius:99px;background:var(--accent);transition:width .4s cubic-bezier(.22,1,.36,1)}
+.week-prog-fill.done{background:linear-gradient(90deg,var(--accent),#60f060)}
+.week-earned{font-size:.68rem;color:var(--text);text-align:center;padding:.5rem;background:rgba(200,240,96,.05);border-radius:8px;border:1px solid rgba(200,240,96,.1)}
+.week-earned span{color:var(--accent);font-family:'DM Serif Display',serif;font-size:.9rem}
+.bills-covered{margin-top:.7rem;border-top:1px solid var(--border);padding-top:.6rem}
+.bills-covered-title{font-size:.48rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+.bill-chip{display:inline-flex;align-items:center;gap:.3rem;font-size:.55rem;padding:3px 7px;border-radius:20px;margin:.15rem .15rem 0 0;border:1px solid var(--border);color:var(--muted);background:var(--card2)}
+.bill-chip.covered{background:rgba(90,122,90,.15);border-color:rgba(90,155,90,.25);color:#5a9a5a}
+.bill-chip .chip-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+.month-overview{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem;margin-bottom:1.25rem}
+.mo-title{font-size:.52rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.85rem}
+.mo-bar-row{display:flex;align-items:center;gap:.65rem;margin-bottom:.55rem;font-size:.65rem}
+.mo-bar-label{width:70px;color:var(--muted);white-space:nowrap;flex-shrink:0}
+.mo-bar-bg{flex:1;height:5px;background:var(--border);border-radius:99px;overflow:hidden}
+.mo-bar-fill{height:100%;border-radius:99px;transition:width .5s}
+.mo-bar-val{width:55px;text-align:right;color:var(--text);flex-shrink:0}
+
+.chart-section{margin-bottom:1.5rem}
+.chart-title{font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem;padding-left:.25rem}
+.donut-wrap{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.5rem;display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap}
+svg.donut{width:140px;height:140px;flex-shrink:0;margin:0 auto}
+.legend{flex:1;min-width:140px;display:flex;flex-direction:column;gap:.4rem;max-height:220px;overflow-y:auto}
+.legend::-webkit-scrollbar{width:3px}
+.legend::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+.legend-item{display:flex;align-items:center;gap:.5rem;font-size:.62rem}
+.legend-dot{width:7px;height:7px;border-radius:2px;flex-shrink:0}
+.legend-name{color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.legend-pct{color:var(--text)}
+
+footer{text-align:center;font-size:.55rem;color:var(--muted);letter-spacing:.1em;padding-top:1rem}
+.flash{animation:flash .4s ease}
+@keyframes flash{0%,100%{background:transparent}50%{background:rgba(200,240,96,.08)}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <p class="label">Presupuesto mensual · <span id="month-label"></span></p>
+  <h1>Mi <span>Presupuesto</span></h1>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="showPanel('gastos')">Gastos</button>
+  <button class="tab" onclick="showPanel('semanas')">Semanas</button>
+</div>
+
+<!-- GASTOS -->
+<div class="panel active" id="panel-gastos">
+
+  <div class="summary">
+    <div class="sum-card c-total"><div class="sum-label">Total</div><div class="sum-value" id="s-total" style="color:var(--accent)">$0</div></div>
+    <div class="sum-card c-fixed"><div class="sum-label">Gastos fijos</div><div class="sum-value" id="s-fixed" style="color:var(--accent2)">$0</div></div>
+    <div class="sum-card c-savings"><div class="sum-label">Ahorros</div><div class="sum-value" id="s-savings" style="color:var(--savings)">$0</div></div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span>Pagado este mes</span><span id="paid-label"></span></div>
+    <div class="progress-bg"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+  </div>
+
+  <div class="expense-list">
+    <div class="list-header">
+      <span>Categoría</span>
+      <span>Monto</span>
+      <span>Día vence</span>
+      <span>%</span>
+      <span style="text-align:center">✓</span>
+      <span></span>
+    </div>
+    <div id="items"></div>
+  </div>
+
+  <div class="add-section">
+    <div class="add-title">+ Agregar categoría</div>
+    <div class="add-row">
+      <input class="add-input" id="new-name" placeholder="Nombre…" />
+      <input class="add-input" id="new-amount" placeholder="$0" type="number" min="0" />
+      <input class="add-input" id="new-due" placeholder="Día (1-31)" type="number" min="1" max="31" />
+      <button class="add-btn" onclick="addCategory()">Agregar</button>
+    </div>
+    <div class="add-row2">
+      <label class="toggle-label" id="savings-toggle-lbl">
+        <div class="toggle-box" id="new-savings-box">✓</div>Ahorro
+      </label>
+      <label class="toggle-label" id="weekly-toggle-lbl">
+        <div class="toggle-box" id="new-weekly-box">✓</div>Semanal (sin día fijo)
+      </label>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <p class="chart-title">Distribución visual</p>
+    <div class="donut-wrap">
+      <svg class="donut" viewBox="0 0 36 36" id="donut"></svg>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- SEMANAS -->
+<div class="panel" id="panel-semanas">
+  <div class="month-header" id="weeks-month-label"></div>
+  <div class="weeks-grid" id="weeks-grid"></div>
+  <div class="month-overview">
+    <div class="mo-title">Acumulado mensual vs meta $4,000</div>
+    <div id="month-bars"></div>
+  </div>
+</div>
+
+<footer>PRESUPUESTO PERSONAL &nbsp;·&nbsp; <span id="footer-date"></span></footer>
+</div>
+
+<script>
+const WEEK_GOAL = 1000;
+const COLORS = ["#c8f060","#ff6b4a","#60d0f0","#f0c860","#a060f0","#f060a0","#60f0a0","#f09060","#60a0f0","#d0f060","#f06060","#e8a0f0","#f0d060","#60c8f0","#f07060"];
+const MONTH_NAMES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DAY_NAMES=['Lun','Mar','Mié','Jue','Vie'];
+
+const today=new Date();
+const curDay=today.getDate(), curMonth=today.getMonth(), curYear=today.getFullYear();
+
+let categories=[
+  {id:1,  name:"Carro",               amount:1000,savings:false,weekly:false,dueDay:1,  paid:false},
+  {id:2,  name:"Renta",               amount:550, savings:false,weekly:false,dueDay:1,  paid:false},
+  {id:3,  name:"Servicios",           amount:150, savings:false,weekly:false,dueDay:1,  paid:false},
+  {id:4,  name:"Seguro carro",        amount:84,  savings:false,weekly:false,dueDay:6,  paid:false},
+  {id:5,  name:"Gym",                 amount:50,  savings:false,weekly:false,dueDay:11, paid:false},
+  {id:6,  name:"Plan celular",        amount:62,  savings:false,weekly:false,dueDay:13, paid:false},
+  {id:7,  name:"T. Crédito 1",        amount:100, savings:false,weekly:false,dueDay:14, paid:false},
+  {id:8,  name:"T. Crédito 2",        amount:100, savings:false,weekly:false,dueDay:27, paid:false},
+  {id:9,  name:"Gasolina",            amount:400, savings:false,weekly:true, dueDay:null,paid:false},
+  {id:10, name:"Comida",              amount:200, savings:false,weekly:true, dueDay:null,paid:false},
+  {id:11, name:"Deudas Colombia",     amount:500, savings:false,weekly:false,dueDay:1,  paid:false},
+  {id:12, name:"Flor María",          amount:300, savings:false,weekly:false,dueDay:1,  paid:false},
+  {id:13, name:"Ahorros/Emergencias", amount:1000,savings:true, weekly:false,dueDay:null,paid:false},
+];
+let nextId=14, isSavingsNew=false, isWeeklyNew=false;
+
+let weeks=[
+  {days:[false,false,false,false,false]},
+  {days:[false,false,false,false,false]},
+  {days:[false,false,false,false,false]},
+  {days:[false,false,false,false,false]},
+];
+
+function fmt(n){return '$'+Math.round(n).toLocaleString('es-MX')}
+function colorFor(cat){return cat.savings?'#60f0c8':COLORS[categories.filter(c=>!c.savings).indexOf(cat)%COLORS.length]}
+function daysInMonth(){return new Date(curYear,curMonth+1,0).getDate()}
+
+function dueCls(cat){
+  if(!cat.dueDay||cat.weekly) return 'weekly';
+  const diff=cat.dueDay-curDay;
+  if(cat.paid) return 'ok';
+  if(diff<0) return 'late';
+  if(diff<=3) return 'soon';
+  return 'ok';
+}
+function dueLabel(cat){
+  if(cat.weekly||!cat.dueDay) return 'Semanal';
+  const d=cat.dueDay, diff=d-curDay;
+  if(cat.paid) return `Día ${d} ✓`;
+  if(diff<0) return `Día ${d} ✗`;
+  if(diff===0) return `Día ${d} HOY`;
+  if(diff<=3) return `Día ${d} (${diff}d)`;
+  return `Día ${d}`;
+}
+
+function weekEarned(wi){return weeks[wi].days.filter(Boolean).length*200}
+function totalEarned(){return weeks.reduce((s,_,i)=>s+weekEarned(i),0)}
+
+function weekDateRange(wi){
+  const starts=[1,8,15,22],ends=[7,14,21,daysInMonth()];
+  return{start:starts[wi],end:ends[wi]};
+}
+function billsCoveredByWeek(wi){
+  const{start,end}=weekDateRange(wi);
+  return categories.filter(c=>!c.savings&&c.dueDay&&c.dueDay>=start&&c.dueDay<=end);
+}
+
+function autoMarkPaid(){
+  const earned=totalEarned();
+  let rem=earned;
+  const sorted=[...categories].sort((a,b)=>{
+    if(!a.dueDay&&!b.dueDay)return 0;
+    if(!a.dueDay)return 1;
+    if(!b.dueDay)return -1;
+    return a.dueDay-b.dueDay;
+  });
+  sorted.forEach(cat=>{
+    if(rem>=cat.amount){cat.paid=true;rem-=cat.amount;}
+    else{cat.paid=false;}
+  });
+}
+
+// ── RENDER GASTOS ────────────────────────────────────────────────────────────
+function renderGastos(){
+  const total=categories.reduce((s,c)=>s+c.amount,0);
+  const fixedSum=categories.filter(c=>!c.savings).reduce((s,c)=>s+c.amount,0);
+  const savSum=categories.filter(c=>c.savings).reduce((s,c)=>s+c.amount,0);
+  const paidSum=categories.filter(c=>c.paid).reduce((s,c)=>s+c.amount,0);
+  const pct=total>0?Math.round((paidSum/total)*100):0;
+
+  document.getElementById('s-total').textContent=fmt(total);
+  document.getElementById('s-fixed').textContent=fmt(fixedSum);
+  document.getElementById('s-savings').textContent=fmt(savSum);
+  document.getElementById('paid-label').textContent=`${fmt(paidSum)} / ${fmt(total)} · ${pct}%`;
+  document.getElementById('progress-fill').style.width=pct+'%';
+
+  const fixed=categories.filter(c=>!c.savings).sort((a,b)=>(a.dueDay||99)-(b.dueDay||99));
+  const savings=categories.filter(c=>c.savings);
+  const container=document.getElementById('items');
+  container.innerHTML='';
+
+  function renderGroup(group){
+    group.forEach(cat=>{
+      const p=total>0?((cat.amount/total)*100).toFixed(1):'0.0';
+      const color=colorFor(cat);
+      const cls=dueCls(cat);
+      const lbl=dueLabel(cat);
+      const row=document.createElement('div');
+      row.className='expense-row'+(cat.savings?' is-savings':'')+(cat.paid?' is-paid':'');
+      row.dataset.id=cat.id;
+      row.innerHTML=`
+        <input class="row-input" value="${cat.name}" placeholder="Nombre" onchange="updateName(${cat.id},this.value)"/>
+        <input class="row-input amount" value="${cat.amount}" type="number" min="0" style="color:${color}" onchange="updateAmount(${cat.id},this.value)"/>
+        <input class="row-due ${cls}" value="${lbl}" placeholder="Día / Sem"
+               onfocus="this.value='${cat.dueDay||''}';this.type='number';this.min=1;this.max=31"
+               onblur="updateDue(${cat.id},this.value,this)"
+               onkeydown="if(event.key==='Enter')this.blur()"/>
+        <span class="row-pct">${p}%</span>
+        <div class="paid-check${cat.paid?' checked':''}" onclick="togglePaid(${cat.id})">${cat.paid?'✓':''}</div>
+        <button class="delete-btn" onclick="deleteCategory(${cat.id})">×</button>`;
+      container.appendChild(row);
+    });
+  }
+
+  renderGroup(fixed);
+  if(savings.length){
+    const div=document.createElement('div');div.className='section-divider';div.textContent='✦ Ahorros & Emergencias';
+    container.appendChild(div);
+    renderGroup(savings);
+  }
+
+  // Donut
+  const sorted=[...categories].sort((a,b)=>b.amount-a.amount);
+  const r=15.9155,circ=2*Math.PI*r;let offset=0,paths='';
+  sorted.forEach(cat=>{
+    const color=colorFor(cat);const dash=total>0?(cat.amount/total)*circ:0;
+    paths+=`<circle cx="18" cy="18" r="${r}" fill="none" stroke="${color}" stroke-width="3.5" stroke-dasharray="${dash} ${circ-dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 18 18)"/>`;
+    offset+=dash;
+  });
+  document.getElementById('donut').innerHTML=`${paths}
+    <text x="18" y="16.5" text-anchor="middle" fill="#e8ede8" font-size="3.4" font-family="DM Serif Display,serif">${fmt(total)}</text>
+    <text x="18" y="21" text-anchor="middle" fill="#7a8a7a" font-size="2" font-family="DM Mono,monospace">TOTAL</text>`;
+
+  const leg=document.getElementById('legend');leg.innerHTML='';
+  sorted.forEach(cat=>{
+    const color=colorFor(cat);const p=total>0?((cat.amount/total)*100).toFixed(0):0;
+    leg.innerHTML+=`<div class="legend-item"><div class="legend-dot" style="background:${color}"></div><span class="legend-name">${cat.name}</span><span class="legend-pct">${p}%</span></div>`;
+  });
+}
+
+// ── RENDER SEMANAS ───────────────────────────────────────────────────────────
+function renderSemanas(){
+  document.getElementById('weeks-month-label').textContent=`${MONTH_NAMES[curMonth]} ${curYear} · Meta semanal ${fmt(WEEK_GOAL)} · 4 semanas`;
+  const grid=document.getElementById('weeks-grid');grid.innerHTML='';
+  const wRanges=[
+    {label:'Semana 1',dates:'Días 1 – 7'},
+    {label:'Semana 2',dates:'Días 8 – 14'},
+    {label:'Semana 3',dates:'Días 15 – 21'},
+    {label:'Semana 4',dates:`Días 22 – ${daysInMonth()}`},
+  ];
+
+  weeks.forEach((week,wi)=>{
+    const earned=weekEarned(wi);
+    const complete=earned>=WEEK_GOAL;
+    const pct=Math.min(100,Math.round((earned/WEEK_GOAL)*100));
+    const covered=billsCoveredByWeek(wi);
+    const card=document.createElement('div');
+    card.className='week-card'+(complete?' complete':'');
+
+    let daysHtml='';
+    DAY_NAMES.forEach((dn,di)=>{
+      const isEarned=week.days[di];
+      daysHtml+=`<div class="day-btn${isEarned?' earned':''}" onclick="toggleDay(${wi},${di})">
+        <div class="day-name">${dn}</div><div class="day-check"></div></div>`;
+    });
+
+    let chipsHtml='';
+    covered.forEach(cat=>{
+      const isPaid=complete&&cat.paid;
+      chipsHtml+=`<span class="bill-chip${isPaid?' covered':''}"><span class="chip-dot"></span>${cat.name}</span>`;
+    });
+    if(!covered.length) chipsHtml=`<span style="font-size:.52rem;color:var(--muted)">Sin vencimientos esta semana</span>`;
+
+    card.innerHTML=`
+      <div class="week-head">
+        <div><div class="week-title">${wRanges[wi].label}</div><div class="week-dates">${wRanges[wi].dates}</div></div>
+        <div class="week-badge${complete?' done':''}">${complete?'✓ Meta':fmt(earned)+' / '+fmt(WEEK_GOAL)}</div>
+      </div>
+      <div class="week-body">
+        <div class="days-row">${daysHtml}</div>
+        <div class="week-progress">
+          <div class="week-prog-label"><span>${fmt(earned)} ganados</span><span>${pct}%</span></div>
+          <div class="week-prog-bg"><div class="week-prog-fill${complete?' done':''}" style="width:${pct}%"></div></div>
+        </div>
+        <div class="week-earned">Esta semana: <span>${fmt(earned)}</span> ${complete?'🎉':''}</div>
+        <div class="bills-covered">
+          <div class="bills-covered-title">Gastos de esta semana</div>
+          ${chipsHtml}
+        </div>
+      </div>`;
+    grid.appendChild(card);
+  });
+
+  const bars=document.getElementById('month-bars');bars.innerHTML='';
+  const maxBar=4000;
+  weeks.forEach((_,wi)=>{
+    const e=weekEarned(wi);const w=Math.min(100,(e/maxBar)*100);
+    bars.innerHTML+=`<div class="mo-bar-row">
+      <span class="mo-bar-label">Sem ${wi+1}</span>
+      <div class="mo-bar-bg"><div class="mo-bar-fill" style="width:${w}%;background:${e>=WEEK_GOAL?'var(--accent)':'var(--muted)'}"></div></div>
+      <span class="mo-bar-val">${fmt(e)}</span></div>`;
+  });
+  const tot=totalEarned();const tw=Math.min(100,(tot/maxBar)*100);
+  bars.innerHTML+=`<div class="mo-bar-row" style="margin-top:.4rem;border-top:1px solid var(--border);padding-top:.55rem">
+    <span class="mo-bar-label" style="color:var(--text)">Total</span>
+    <div class="mo-bar-bg"><div class="mo-bar-fill" style="width:${tw}%;background:var(--savings)"></div></div>
+    <span class="mo-bar-val" style="color:var(--savings)">${fmt(tot)}</span></div>`;
+}
+
+// ── INTERACTIONS ─────────────────────────────────────────────────────────────
+function updateName(id,val){
+  const c=categories.find(c=>c.id===id);if(c){c.name=val.trim()||c.name;renderAll();}
+}
+function updateAmount(id,val){
+  const c=categories.find(c=>c.id===id);
+  if(c){
+    c.amount=Math.max(0,parseFloat(val)||0);
+    autoMarkPaid();renderAll();
+    const row=document.querySelector(`[data-id="${id}"]`);
+    if(row){row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),400);}
+  }
+}
+function updateDue(id,val,input){
+  const c=categories.find(c=>c.id===id);
+  if(!c)return;
+  const n=parseInt(val);
+  if(!isNaN(n)&&n>=1&&n<=31){
+    c.dueDay=n;c.weekly=false;
+  } else if(val===''||isNaN(n)){
+    c.dueDay=null;c.weekly=true;
+  }
+  autoMarkPaid();renderAll();
+}
+function togglePaid(id){
+  const c=categories.find(c=>c.id===id);if(c){c.paid=!c.paid;renderAll();}
+}
+function deleteCategory(id){
+  categories=categories.filter(c=>c.id!==id);autoMarkPaid();renderAll();
+}
+function addCategory(){
+  const name=document.getElementById('new-name').value.trim();
+  const amount=parseFloat(document.getElementById('new-amount').value)||0;
+  const due=parseInt(document.getElementById('new-due').value)||null;
+  if(!name){document.getElementById('new-name').focus();return;}
+  categories.push({id:nextId++,name,amount,savings:isSavingsNew,weekly:isWeeklyNew||!due,dueDay:due,paid:false});
+  document.getElementById('new-name').value='';
+  document.getElementById('new-amount').value='';
+  document.getElementById('new-due').value='';
+  autoMarkPaid();renderAll();
+}
+function toggleDay(wi,di){
+  weeks[wi].days[di]=!weeks[wi].days[di];autoMarkPaid();renderAll();
+}
+function renderAll(){renderGastos();renderSemanas();}
+function showPanel(name){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>{
+    if((name==='gastos'&&t.textContent.includes('Gasto'))||(name==='semanas'&&t.textContent.includes('Sem')))t.classList.add('active');
+  });
+}
+
+document.getElementById('savings-toggle-lbl').addEventListener('click',()=>{
+  isSavingsNew=!isSavingsNew;document.getElementById('new-savings-box').classList.toggle('on',isSavingsNew);
+});
+document.getElementById('weekly-toggle-lbl').addEventListener('click',()=>{
+  isWeeklyNew=!isWeeklyNew;document.getElementById('new-weekly-box').classList.toggle('on',isWeeklyNew);
+});
+document.getElementById('new-amount').addEventListener('keydown',e=>{if(e.key==='Enter')addCategory();});
+document.getElementById('new-name').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('new-amount').focus();});
+
+// Init
+const mn=MONTH_NAMES[curMonth];
+document.getElementById('month-label').textContent=`${mn} ${curYear}`;
+document.getElementById('footer-date').textContent=`${mn.toUpperCase()} ${curYear}`;
+autoMarkPaid();renderAll();
+</script>
+</body>
+</html>
